@@ -1729,17 +1729,25 @@ class AutoGratis extends ModernUtil {
         this.storage.save('enable_autogratis', !!this.autogratis);
     };
 
-    /* Main loop for the autogratis bot */
+    /* Main loop for the autogratis bot, scans every town the player owns */
     main = () => {
-        const el = uw.$('.type_building_queue.type_free').not('.disabled').not('#dummy_free');
-        if (el.length) {
-            el.click();
-            const town = uw.ITowns.getCurrentTown();
-            for (let model of town.buildingOrders().models) {
-                if (model.attributes.building_time < 300) {
-                    this.callGratis(town.id, model.id);
-                    return;
-                }
+        const now = Math.floor(Date.now() / 1000);
+
+        for (const town_id in uw.ITowns.towns) {
+            const town = uw.ITowns.towns[town_id];
+            if (!town || typeof town.buildingOrders !== 'function') continue;
+
+            const orders = town.buildingOrders();
+            if (!orders || !orders.models || orders.models.length === 0) continue;
+
+            const order = orders.models[0];
+            const completedAt = order.attributes.to_be_completed_at;
+            if (!completedAt) continue;
+
+            const remaining = completedAt - now;
+            if (remaining > 0 && remaining < 300) {
+                this.callGratis(town.id, order.id);
+                return;
             }
         }
     };
